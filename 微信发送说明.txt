@@ -1,0 +1,13 @@
+Claude Code + DeepSeek 一键配置器 V2.9.3 发送说明
+
+1. 请发送完整的“V2.9.3-全新电脑直连修复-未签名测试包.zip”，不要单独发送 EXE。
+2. 接收方先把 ZIP 保存到本地，再右键“全部解压”。
+3. 解压后应同时看到 EXE 和 offline 文件夹；不要在微信预览、聊天软件临时目录或压缩包窗口中直接运行。
+4. 双击 EXE，标题应显示 V2.9.3。输入自己的 DeepSeek API Key，选择 V4 Flash 或 V4 Pro 1M，点击“开始安装并配置”。
+5. 配置器会自动准备 PortableGit、Node/npm、Claude Code，并做真实 API 测试。VS Code 是可选项。
+
+如果提示“安装包没有完整解压”，请检查 ZIP 是否完整、offline 是否与 EXE 同级。不要复制旧版 offline 文件夹混用。
+
+未签名测试包可能触发 SmartScreen。请只从可信发送者接收并核对 SHA256SUMS；不要关闭 Windows 安全中心。正式发布需要代码签名。
+
+V2.9.3 不安装 Python/LiteLLM，不运行本机 4000 端口代理。API Key 保存在 Windows 凭据管理器，并只注入到启动的 Claude Code 子进程。

@@ -1,0 +1,24 @@
+Claude Code + DeepSeek 一键配置器 V2.9.3 兼容性说明
+
+支持：
+- Windows 10/11 x64，普通当前用户权限
+- 未安装 Python、Git、Node.js、npm、Claude Code、VS Code 的全新电脑
+- 已存在用户自有 Git/Node/Claude/VS Code 的电脑（验证通过后复用）
+- 中文用户名、带空格路径
+- 国内 npm 镜像、npm 官方源、Anthropic 官方安装源与 WinGet 多源回退
+
+内置基础组件：
+- PortableGit 2.55.0.5（GitHub 官方 SHA-256 + Authenticode 发布者校验）
+- Node.js 22.23.2（Node 官方 SHASUMS256 校验）
+
+不再需要：
+- Python 3.12、venv、LiteLLM
+- 127.0.0.1:4000 本地代理
+- 永久 ANTHROPIC_* 用户环境变量
+
+外部限制：
+- 必须能访问至少一个 Claude Code 安装源以及 DeepSeek API。
+- 企业应用白名单、杀毒隔离、磁盘不足、TLS 劫持、DeepSeek Key 无效或余额不足会产生明确错误，但配置器不能绕过管理员安全策略或服务端故障。
+- 当前通用包不支持 ARM64 或 32 位 Windows。
+
+本项目是第三方社区工具，不是 Anthropic、DeepSeek、Microsoft、Node.js 或 Git for Windows 官方产品。

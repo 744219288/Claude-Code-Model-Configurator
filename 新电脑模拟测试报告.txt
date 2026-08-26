@@ -1,0 +1,14 @@
+Claude Code + DeepSeek 一键配置器 V2.9.3 新电脑模拟测试报告
+
+自动化：98 项测试通过。
+
+真实隔离部署测试（工作区临时运行目录，无系统 Git/Node/npm 依赖）：
+1. offline manifest：3 个声明文件全部通过大小与 SHA-256 校验。
+2. PortableGit 2.55.0.5：Authenticode 发布者 Johannes Schindelin 验证通过；实际解压；git.exe 与 bash.exe 存在；git --version 成功。
+3. Node.js 22.23.2：Node 官方 SHA-256 匹配；实际解压；node --version 输出 v22.23.2；npm --version 输出 10.9.8。
+4. Claude Code npm 回退：国内镜像主包/Windows x64 平台包共同稳定版本解析为 2.1.231；固定版本实际安装成功；claude --version 验证通过。
+5. API 路由：仅使用 https://api.deepseek.com/anthropic 和 V4 模型变量；无 LiteLLM、本地代理或永久密钥环境变量。
+6. 凭据：覆盖缺失凭据 1168、访问拒绝 5、失败但错误码为 0 等分支，确保不再把失败显示成“Windows 错误码 0”。
+7. 资源路径：覆盖完整 payload 固定复制、复制后二次校验和缺失资源的完整解压提示。
+
+仍需在真正全新的 Windows 10/11 x64 虚拟机执行最终人工验收：GUI 输入真实 Key、完整安装、DeepSeek 对话、重启后桌面/终端启动、完整卸载和安装前后快照对比。当前报告不虚构尚未执行的虚拟机结果。

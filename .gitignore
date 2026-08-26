@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.build-venv/
+.venv/
+build-v*/
+dist-v*/
+release-v*/
+source-v*/
+*.spec.bak
+*.log
+.env
+.env.*
+!.env.example
+

@@ -1,0 +1,48 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "name": "Claude-Code-DeepSeek-Configurator",
+      "version": "2.9.3"
+    }
+  },
+  "components": [
+    {
+      "type": "application",
+      "name": "Node.js managed runtime",
+      "version": "22.23.2",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1177b4137ba5adaa56354ae40f1080c7450e8ae09cecb47da459d1c52ac99f97"
+        }
+      ],
+      "properties": [
+        {
+          "name": "offline-archive",
+          "value": "node-v22.23.2-win-x64.zip"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "PortableGit for Windows",
+      "version": "2.55.0.5",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "5aa8a20f6e9abb2c755f0e73c91c687701a46b309ad84a0ca6509380fa4ae290"
+        }
+      ],
+      "properties": [
+        {
+          "name": "offline-archive",
+          "value": "PortableGit-2.55.0.5-64-bit.7z.exe"
+        }
+      ]
+    }
+  ]
+}
