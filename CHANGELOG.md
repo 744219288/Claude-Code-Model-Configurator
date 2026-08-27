@@ -1,5 +1,25 @@
 # Changelog
 
+## V2.9.6 - 2026-08-26（全新电脑直连修复）
+
+- **凭据管理修复**：凭据模块改用 `ctypes.WinDLL("Advapi32.dll", use_last_error=True)`，每次调用前清零、失败后立即读取；仅将 `ERROR_NOT_FOUND (1168)` 视为幂等删除成功，彻底消除“删除凭据失败，错误码 0”。
+- **离线资源修复**：冻结构建首跑校验相邻 `offline` 清单，并以原子方式复制到 `%LOCALAPPDATA%\Programs\ClaudeDeepSeekConfigurator\offline.new-*`，复制完成后再逐文件校验才切换，修复全新电脑上稳定副本缺资源、找不到受管理 Node.js 的问题。
+- **入口自包含**：稳定 EXE、完整离线资源与完整性 sidecar 同处程序根目录，桌面 / 终端入口不再依赖 ZIP、微信缓存或启动工作目录。
+- **直连架构不变**：继续直连 DeepSeek 官方 Anthropic 接口，无 Python / LiteLLM / 本地代理；内置 PortableGit 2.55.0.5 与 Node.js 22.23.2 隔离于配置器目录。
+- **安装选路优化**：安装优先 WinGet / Anthropic 原生，npm 回退解析 `stable/latest` 并确认 Windows x64 平台包同版本已发布才安装，规避 `@latest` 竞态。
+- **模型与凭据**：模型 `deepseek-v4-flash` / `deepseek-v4-pro[1m]`，清理旧代理环境变量，密钥仅注入子进程。
+- **质量**：自动化测试 98 项通过；发布仍须受信任代码签名，未签名测试包可能触发 SmartScreen。
+
+## V2.9.3
+
+- 修复 Windows 凭据 API 最后错误码丢失导致的“删除凭据失败，错误码 0”。
+- 修复稳定 EXE 未携带 offline 资源、在微信 / ZIP 临时路径运行后找不到受管理 Node.js。
+- 切换到 DeepSeek Anthropic 官方接口直连，移除新安装流程中的 Python / LiteLLM / 本地代理。
+- 内置 PortableGit 2.55.0.5 与 Node.js 22.23.2，支持无开发环境的新电脑。
+- npm 安装增加主包与 Windows x64 平台包同版本发布验证，拒绝不完整的 `@latest`。
+- 模型更新为 DeepSeek V4 Flash / V4 Pro 1M；密钥仅注入子进程。
+- 新增完整 payload 原子安装与二次校验，自动化测试增至 98 项。
+
 ## V2.9.2 - 2026-08-23
 
 - 新增经 Node.js 官方 SHA-256 和 OpenJS Foundation 数字签名验证的 Node.js 22.23.2 便携运行环境；只解压到配置器目录，不修改系统 PATH。
@@ -9,7 +29,7 @@
 - 普通错误弹窗升级为安装方案选择窗口，可切换国内镜像、官方 npm、官方原生、WinGet、检测到的代理或导出诊断。
 - VS Code 与 Anthropic 扩展改为默认不勾选的可选增强，安装失败不再阻断 Claude Code CLI 核心功能。
 - 新增“检查更新”入口：外部组件只提示，受管理 Claude Code 可按原来源更新并在失败时尝试恢复原版本；配置器自更新要求 HTTPS、SHA-256 和 Authenticode 发布者三重验证。
-- 受管理 Node/npm、npm缓存、Claude安装前 `pending` 记录及更新状态纳入完整卸载和失败回滚。
+- 受管理 Node/npm、npm 缓存、Claude 安装前 `pending` 记录及更新状态纳入完整卸载和失败回滚。
 - 桌面快捷方式改为打开配置器主界面，不再携带 `--launch-claude` 参数直接跳转终端；Claude Code 由用户在界面中主动启动。
 - 自动化测试增至 87 项，并完成一次强制模拟“无 Claude、无 Node、无 npm”的隔离目录 npm 国内镜像真实安装与版本验证。
 
@@ -73,22 +93,3 @@
 ## V2.7
 
 - 优先使用 Anthropic 官方原生 `claude.exe`，增加安全的 `claude.cmd` 入口与 52 项测试矩阵。
-# V2.9.3
-
-- 修复 Windows 凭据 API 最后错误码丢失导致的“删除凭据失败，错误码 0”。
-- 修复稳定 EXE 未携带 offline 资源、微信/ZIP 临时路径运行后找不到受管理 Node.js。
-- 切换到 DeepSeek Anthropic 官方接口直连，移除新安装流程中的 Python/LiteLLM/本地代理。
-- 内置 PortableGit 2.55.0.5 和 Node.js 22.23.2，支持无开发环境的新电脑。
-- npm 安装增加主包与 Windows x64 平台包同版本发布验证，拒绝不完整的 `@latest`。
-- 模型更新为 DeepSeek V4 Flash / V4 Pro 1M；密钥仅注入子进程。
-- 新增完整 payload 原子安装与二次校验，自动化测试增至 98 项。
-
-## V2.9.6 - 2026-08-26
-
-- 凭据模块改用 `ctypes.WinDLL("Advapi32.dll", use_last_error=True)`，每次调用前清零、失败后立即读取；仅 `ERROR_NOT_FOUND (1168)` 视为幂等删除成功，修复“删除凭据失败，错误码 0”。
-- 冻结构建首跑校验相邻 `offline` 清单并原子复制到 `%LOCALAPPDATA%\Programs\ClaudeDeepSeekConfigurator\offline.new-*`，复制后再次逐文件校验再切换，修复稳定副本缺资源导致找不到受管理 Node.js。
-- 稳定 EXE、完整离线资源与完整性 sidecar 同处程序根目录，桌面/终端入口不再依赖 ZIP、微信缓存或启动工作目录。
-- 继续直连 DeepSeek 官方 Anthropic 接口，无 Python/LiteLLM/本地代理；内置 PortableGit 2.55.0.5 与 Node.js 22.23.2 隔离于配置器目录。
-- 安装优先 WinGet/Anthropic 原生，npm 回退解析 `stable/latest` 并确认 Windows x64 平台包同版本已发布才安装，规避 `@latest` 竞态。
-- 模型 `deepseek-v4-flash` / `deepseek-v4-pro[1m]`，清理旧代理环境变量，密钥仅注入子进程。
-- 自动化测试 98 项通过；发布仍须受信任代码签名，未签名测试包可能触发 SmartScreen。
