@@ -1,4 +1,4 @@
-Claude Code + DeepSeek 一键配置器 V2.9.3 新电脑模拟测试报告
+Claude Code + DeepSeek 一键配置器 V2.9.6 新电脑模拟测试报告
 
 自动化：98 项测试通过。
 

@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-APP_VERSION = "2.9.3"
+APP_VERSION = "2.9.6"
 NODE_VERSION = "22.23.2"
 GIT_VERSION = "2.55.0.5"
 

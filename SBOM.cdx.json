@@ -6,7 +6,7 @@
     "component": {
       "type": "application",
       "name": "Claude-Code-DeepSeek-Configurator",
-      "version": "2.9.3"
+      "version": "2.9.6"
     }
   },
   "components": [

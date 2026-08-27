@@ -1,8 +1,8 @@
 ﻿$ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ReleaseVersion = 'V2.9.3'
+$ReleaseVersion = 'V2.9.6'
 $OutputRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $ProjectRoot)) 'outputs'
-$Exe = Join-Path $ProjectRoot 'dist-v293\Claude-Code-DeepSeek-一键配置器.exe'
+$Exe = Join-Path $ProjectRoot 'dist-v296\Claude-Code-DeepSeek-一键配置器.exe'
 $Staging = Join-Path $ProjectRoot 'release-v2'
 $SourceStaging = Join-Path $ProjectRoot 'source-v2'
 $ManifestPath = Join-Path $ProjectRoot 'offline\manifest.json'
@@ -53,7 +53,7 @@ if (Test-Path -LiteralPath $Staging) {
 New-Item -ItemType Directory -Path $Staging | Out-Null
 Copy-Item -LiteralPath $Exe -Destination (Join-Path $Staging 'Claude-Code-DeepSeek-一键配置器.exe')
 Copy-Item -LiteralPath (Join-Path $ProjectRoot 'offline') -Destination $Staging -Recurse
-foreach ($ReleaseFile in @('微信发送说明.txt', '兼容性说明.txt', '新电脑模拟测试报告.txt', 'V2.9.3全新电脑直连修复报告.md', 'V2.8升级报告.md', 'V2.8.1新电脑运行热修复报告.md', 'V2.8.1干净部署实测结果.json', 'V2.8.2终端体验热修复报告.md', 'V2.9完整回滚与桌面启动升级报告.md', 'V2.9.1完整卸载热修复报告.md', 'V2.9.2国内网络增强升级报告.md', 'SBOM.cdx.json', 'SHA256SUMS', 'release-integrity.json', 'CHANGELOG.md')) {
+foreach ($ReleaseFile in @('微信发送说明.txt', '兼容性说明.txt', '新电脑模拟测试报告.txt', 'V2.9.6全新电脑直连修复报告.md', 'V2.8升级报告.md', 'V2.8.1新电脑运行热修复报告.md', 'V2.8.1干净部署实测结果.json', 'V2.8.2终端体验热修复报告.md', 'V2.9完整回滚与桌面启动升级报告.md', 'V2.9.1完整卸载热修复报告.md', 'V2.9.2国内网络增强升级报告.md', 'SBOM.cdx.json', 'SHA256SUMS', 'release-integrity.json', 'CHANGELOG.md')) {
     Copy-Item -LiteralPath (Join-Path $ProjectRoot $ReleaseFile) -Destination $Staging
 }
 
@@ -80,7 +80,7 @@ Copy-Item -LiteralPath (Join-Path $ProjectRoot 'tests') -Destination $SourceStag
 Copy-Item -LiteralPath (Join-Path $ProjectRoot 'offline') -Destination $SourceStaging -Recurse
 Copy-Item -LiteralPath (Join-Path $ProjectRoot 'tools') -Destination $SourceStaging -Recurse
 Copy-Item -LiteralPath (Join-Path $ProjectRoot 'assets') -Destination $SourceStaging -Recurse
-foreach ($Name in @('main.py', 'README.md', 'CHANGELOG.md', 'V2.9.3全新电脑直连修复报告.md', 'V2.8升级报告.md', 'V2.8.1新电脑运行热修复报告.md', 'V2.8.1干净部署实测结果.json', 'V2.8.2终端体验热修复报告.md', 'V2.9完整回滚与桌面启动升级报告.md', 'V2.9.1完整卸载热修复报告.md', 'V2.9.2国内网络增强升级报告.md', 'requirements-dev.txt', 'build.ps1', 'build_offline_assets.ps1', 'sign_build.ps1', 'package_v2.ps1', '微信发送说明.txt', '兼容性说明.txt', '新电脑模拟测试报告.txt', 'SBOM.cdx.json')) {
+foreach ($Name in @('main.py', 'README.md', 'CHANGELOG.md', 'V2.9.6全新电脑直连修复报告.md', 'V2.8升级报告.md', 'V2.8.1新电脑运行热修复报告.md', 'V2.8.1干净部署实测结果.json', 'V2.8.2终端体验热修复报告.md', 'V2.9完整回滚与桌面启动升级报告.md', 'V2.9.1完整卸载热修复报告.md', 'V2.9.2国内网络增强升级报告.md', 'requirements-dev.txt', 'build.ps1', 'build_offline_assets.ps1', 'sign_build.ps1', 'package_v2.ps1', '微信发送说明.txt', '兼容性说明.txt', '新电脑模拟测试报告.txt', 'SBOM.cdx.json')) {
     Copy-Item -LiteralPath (Join-Path $ProjectRoot $Name) -Destination $SourceStaging
 }
 $SourceZip = Join-Path $OutputRoot "Claude-Code-DeepSeek-Configurator-$ReleaseVersion-Secure-Source.zip"

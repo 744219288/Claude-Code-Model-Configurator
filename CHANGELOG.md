@@ -82,3 +82,13 @@
 - npm 安装增加主包与 Windows x64 平台包同版本发布验证，拒绝不完整的 `@latest`。
 - 模型更新为 DeepSeek V4 Flash / V4 Pro 1M；密钥仅注入子进程。
 - 新增完整 payload 原子安装与二次校验，自动化测试增至 98 项。
+
+## V2.9.6 - 2026-08-26
+
+- 凭据模块改用 `ctypes.WinDLL("Advapi32.dll", use_last_error=True)`，每次调用前清零、失败后立即读取；仅 `ERROR_NOT_FOUND (1168)` 视为幂等删除成功，修复“删除凭据失败，错误码 0”。
+- 冻结构建首跑校验相邻 `offline` 清单并原子复制到 `%LOCALAPPDATA%\Programs\ClaudeDeepSeekConfigurator\offline.new-*`，复制后再次逐文件校验再切换，修复稳定副本缺资源导致找不到受管理 Node.js。
+- 稳定 EXE、完整离线资源与完整性 sidecar 同处程序根目录，桌面/终端入口不再依赖 ZIP、微信缓存或启动工作目录。
+- 继续直连 DeepSeek 官方 Anthropic 接口，无 Python/LiteLLM/本地代理；内置 PortableGit 2.55.0.5 与 Node.js 22.23.2 隔离于配置器目录。
+- 安装优先 WinGet/Anthropic 原生，npm 回退解析 `stable/latest` 并确认 Windows x64 平台包同版本已发布才安装，规避 `@latest` 竞态。
+- 模型 `deepseek-v4-flash` / `deepseek-v4-pro[1m]`，清理旧代理环境变量，密钥仅注入子进程。
+- 自动化测试 98 项通过；发布仍须受信任代码签名，未签名测试包可能触发 SmartScreen。

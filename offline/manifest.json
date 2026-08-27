@@ -1,7 +1,7 @@
 {
   "format": 3,
   "created_at": "2026-08-26T10:00:49.0569927Z",
-  "app_version": "2.9.3",
+  "app_version": "2.9.6",
   "connection_mode": "direct-anthropic",
   "node_version": "22.23.2",
   "git_version": "2.55.0.5",

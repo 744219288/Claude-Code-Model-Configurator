@@ -1,8 +1,8 @@
-# Claude Code + DeepSeek 一键配置器 V2.9.3
+# Claude Code + DeepSeek 一键配置器 V2.9.6
 
 面向全新 Windows 10/11 x64 电脑的一键安装器。电脑不需要预装 Python、Node.js、npm、Git、Claude Code 或 VS Code；用户输入 DeepSeek API Key 后，配置器会准备必要组件、安装 Claude Code、验证 API，并创建桌面和终端入口。
 
-## V2.9.3 的关键改变
+## V2.9.6 的关键改变
 
 - 直接连接 DeepSeek 官方 Anthropic 兼容接口 `https://api.deepseek.com/anthropic`。
 - 不再安装或运行 Python、LiteLLM、venv 和 `127.0.0.1:4000` 本地代理。
@@ -16,7 +16,7 @@
 
 ## 发送与使用
 
-1. 发送整个 V2.9.3 ZIP，不要只发送 EXE。
+1. 发送整个 V2.9.6 ZIP，不要只发送 EXE。
 2. 在新电脑上把 ZIP 保存到本地，右键“全部解压”。
 3. 从解压后的目录运行 `Claude-Code-DeepSeek-一键配置器.exe`，不要在微信预览或压缩包预览中直接运行。
 4. 输入 DeepSeek API Key，选择模型，点击“开始安装并配置”。
@@ -61,6 +61,6 @@ python -m unittest discover -s tests
 - 受管理 npm 通过国内镜像查询到主包/Windows 平台包共同版本 2.1.231，实际安装后 `claude --version` 通过。
 - 离线 manifest 当前锁定 PortableGit、Node ZIP 和 Node 官方 SHA 清单。
 
-真正宣称“任何正常电脑都绝不出问题”是不负责任的：企业应用控制、杀毒误报、断网、服务端故障或 DeepSeek 账户状态仍可能阻止安装。但 V2.9.3 已消除已知的凭据错误码、临时路径资源丢失、LiteLLM/Python 代理链和 npm 平台包发布竞态，并对每个剩余失败点提供可诊断错误。
+真正宣称“任何正常电脑都绝不出问题”是不负责任的：企业应用控制、杀毒误报、断网、服务端故障或 DeepSeek 账户状态仍可能阻止安装。但 V2.9.6 已消除已知的凭据错误码、临时路径资源丢失、LiteLLM/Python 代理链和 npm 平台包发布竞态，并对每个剩余失败点提供可诊断错误。
 
 本项目是第三方社区工具，不隶属于或代表 Anthropic、DeepSeek、Microsoft、Node.js 或 Git for Windows。

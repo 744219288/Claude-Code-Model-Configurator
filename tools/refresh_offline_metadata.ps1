@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$ProjectRoot = (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
 )
 
@@ -31,7 +31,7 @@ foreach ($Name in $Required) {
 $Manifest = [ordered]@{
     format = 3
     created_at = (Get-Date).ToUniversalTime().ToString('o')
-    app_version = '2.9.3'
+    app_version = '2.9.6'
     connection_mode = 'direct-anthropic'
     node_version = $NodeVersion
     git_version = $GitVersion
@@ -53,8 +53,8 @@ $Components = @(
 )
 $Sbom = [ordered]@{
     bomFormat = 'CycloneDX'; specVersion = '1.5'; version = 1
-    metadata = [ordered]@{ component = [ordered]@{ type = 'application'; name = 'Claude-Code-DeepSeek-Configurator'; version = '2.9.3' } }
+    metadata = [ordered]@{ component = [ordered]@{ type = 'application'; name = 'Claude-Code-DeepSeek-Configurator'; version = '2.9.6' } }
     components = $Components
 }
 [IO.File]::WriteAllText((Join-Path $ProjectRoot 'SBOM.cdx.json'), ($Sbom | ConvertTo-Json -Depth 8), $Utf8NoBom)
-Write-Host "已生成 V2.9.3 manifest 与 SBOM，共锁定 $($Files.Count) 个文件。"
+Write-Host "已生成 V2.9.6 manifest 与 SBOM，共锁定 $($Files.Count) 个文件。"

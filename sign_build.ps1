@@ -11,7 +11,7 @@
 
 $ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Exe = Join-Path $ProjectRoot 'dist-v293\Claude-Code-DeepSeek-一键配置器.exe'
+$Exe = Join-Path $ProjectRoot 'dist-v296\Claude-Code-DeepSeek-一键配置器.exe'
 $IntegrityPath = Join-Path $ProjectRoot 'release-integrity.json'
 $SumsPath = Join-Path $ProjectRoot 'SHA256SUMS'
 
@@ -44,7 +44,7 @@ if ($ExpectedPublisher -and $Publisher.IndexOf($ExpectedPublisher, [StringCompar
 
 $Integrity = [ordered]@{
     format = 1
-    version = '2.9.3'
+    version = '2.9.6'
     executable = 'Claude-Code-DeepSeek-一键配置器.exe'
     sha256 = (Get-FileHash -LiteralPath $Exe -Algorithm SHA256).Hash.ToLowerInvariant()
     publisher = $Publisher

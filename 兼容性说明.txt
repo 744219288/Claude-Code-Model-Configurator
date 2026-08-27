@@ -1,4 +1,4 @@
-Claude Code + DeepSeek 一键配置器 V2.9.3 兼容性说明
+Claude Code + DeepSeek 一键配置器 V2.9.6 兼容性说明
 
 支持：
 - Windows 10/11 x64，普通当前用户权限

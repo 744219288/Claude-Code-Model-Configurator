@@ -19,8 +19,8 @@ if (-not (Test-Path -LiteralPath $BuildVenv)) {
 $BuildPython = Join-Path $BuildVenv 'Scripts\python.exe'
 & $BuildPython -m pip install --disable-pip-version-check --upgrade 'pyinstaller==6.16.0'
 & $BuildPython -m PyInstaller --noconfirm --clean --onefile --windowed `
-    --distpath (Join-Path $ProjectRoot 'dist-v293') `
-    --workpath (Join-Path $ProjectRoot 'build-v293') `
+    --distpath (Join-Path $ProjectRoot 'dist-v296') `
+    --workpath (Join-Path $ProjectRoot 'build-v296') `
     --specpath $ProjectRoot `
     --name 'Claude-Code-DeepSeek-一键配置器' `
     --icon (Join-Path $ProjectRoot 'assets\app_icon.ico') `
@@ -29,4 +29,4 @@ $BuildPython = Join-Path $BuildVenv 'Scripts\python.exe'
     --runtime-hook (Join-Path $ProjectRoot 'hooks\runtime_tkinter.py') `
     (Join-Path $ProjectRoot 'main.py')
 
-Write-Host "构建完成：$(Join-Path $ProjectRoot 'dist-v293')"
+Write-Host "构建完成：$(Join-Path $ProjectRoot 'dist-v296')"

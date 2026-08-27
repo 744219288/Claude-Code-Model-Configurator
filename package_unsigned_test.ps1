@@ -1,20 +1,20 @@
 ﻿$ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $OutputRoot = Split-Path -Parent $ProjectRoot
-$Exe = Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'dist-v293') -Filter '*.exe' | Select-Object -First 1
+$Exe = Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'dist-v296') -Filter '*.exe' | Select-Object -First 1
 $ManifestPath = Join-Path $ProjectRoot 'offline\manifest.json'
 $SbomPath = Join-Path $ProjectRoot 'SBOM.cdx.json'
-$TestStaging = Join-Path $ProjectRoot 'release-v293-unsigned'
-$SourceStaging = Join-Path $ProjectRoot 'source-v293'
-$TestZip = Join-Path $OutputRoot 'Claude-Code-DeepSeek-V2.9.3-全新电脑直连修复-未签名测试包.zip'
-$SourceZip = Join-Path $OutputRoot 'Claude-Code-DeepSeek-Configurator-V2.9.3-Secure-Source.zip'
+$TestStaging = Join-Path $ProjectRoot 'release-v296-unsigned'
+$SourceStaging = Join-Path $ProjectRoot 'source-v296'
+$TestZip = Join-Path $OutputRoot 'Claude-Code-DeepSeek-V2.9.6-全新电脑直连修复-未签名测试包.zip'
+$SourceZip = Join-Path $OutputRoot 'Claude-Code-DeepSeek-Configurator-V2.9.6-Secure-Source.zip'
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
-if (-not $Exe) { throw '未找到 dist-v293 中的 V2.9.3 EXE。' }
+if (-not $Exe) { throw '未找到 dist-v296 中的 V2.9.6 EXE。' }
 if ((Get-AuthenticodeSignature -LiteralPath $Exe.FullName).Status -eq 'Valid') {
     throw '当前 EXE 已有有效签名，请使用正式签名发布流程，不要生成未签名测试包。'
 }
-foreach ($Required in @($ManifestPath, $SbomPath, (Join-Path $ProjectRoot 'V2.9.3仅供测试-未签名.txt'))) {
+foreach ($Required in @($ManifestPath, $SbomPath, (Join-Path $ProjectRoot 'V2.9.6仅供测试-未签名.txt'))) {
     if (-not (Test-Path -LiteralPath $Required -PathType Leaf)) { throw "缺少测试包文件：$Required" }
 }
 $Manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
@@ -43,8 +43,8 @@ Reset-ProjectStaging $TestStaging
 Copy-Item -LiteralPath $Exe.FullName -Destination (Join-Path $TestStaging 'Claude-Code-DeepSeek-一键配置器.exe')
 Copy-Item -LiteralPath (Join-Path $ProjectRoot 'offline') -Destination $TestStaging -Recurse
 foreach ($Name in @(
-    'V2.9.3仅供测试-未签名.txt', '微信发送说明.txt', '兼容性说明.txt',
-    '新电脑模拟测试报告.txt', 'V2.9.3全新电脑直连修复报告.md',
+    'V2.9.6仅供测试-未签名.txt', '微信发送说明.txt', '兼容性说明.txt',
+    '新电脑模拟测试报告.txt', 'V2.9.6全新电脑直连修复报告.md',
     'V2.9.1完整卸载热修复报告.md', 'CHANGELOG.md', 'SBOM.cdx.json'
 )) {
     Copy-Item -LiteralPath (Join-Path $ProjectRoot $Name) -Destination $TestStaging
@@ -74,7 +74,7 @@ foreach ($Name in @(
     'V2.8升级报告.md', 'V2.8.1新电脑运行热修复报告.md', 'V2.8.1干净部署实测结果.json',
     'V2.8.2终端体验热修复报告.md', 'V2.9完整回滚与桌面启动升级报告.md',
     'V2.9.1完整卸载热修复报告.md', 'V2.9.2国内网络增强升级报告.md',
-    'V2.9.3全新电脑直连修复报告.md', 'V2.9.3仅供测试-未签名.txt', 'SBOM.cdx.json'
+    'V2.9.6全新电脑直连修复报告.md', 'V2.9.6仅供测试-未签名.txt', 'SBOM.cdx.json'
 )) {
     Copy-Item -LiteralPath (Join-Path $ProjectRoot $Name) -Destination $SourceStaging
 }

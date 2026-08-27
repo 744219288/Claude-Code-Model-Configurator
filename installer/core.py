@@ -36,7 +36,7 @@ from .credentials import (
 
 
 APP_NAME = "ClaudeDeepSeekConfigurator"
-APP_VERSION = "2.9.3"
+APP_VERSION = "2.9.6"
 PYTHON_VERSION = "3.12.10"
 PYTHON_URL = f"https://www.python.org/ftp/python/{PYTHON_VERSION}/python-{PYTHON_VERSION}-amd64.exe"
 LITELLM_VERSION = "1.80.11"
@@ -1611,7 +1611,7 @@ def resolve_claude_npm_version(
     if not isinstance(values, dict):
         raise InstallError("npm 没有返回 Claude Code 发布标签")
     checked: list[str] = []
-    for tag in ("stable", "latest"):
+    for tag in ("latest", "stable"):
         version = str(values.get(tag) or "").strip()
         if not re.fullmatch(r"\d+(?:\.\d+){2,3}(?:[-+][0-9A-Za-z.-]+)?", version):
             continue
@@ -2027,8 +2027,7 @@ def capture_install_baseline(paths: Paths) -> dict[str, object]:
         "vscode_extension": {"present": vscode_extension_is_installed()},
         "user_path": _user_path_entries(),
         "desktop_shortcut": {
-            "primary_existed": desktop_shortcut_path().exists(),
-            "legacy_existed": legacy_desktop_shortcut_path().exists(),
+            f"{s.name}_existed": s.exists() for s in desktop_shortcut_paths()
         },
     }
 
@@ -2041,10 +2040,8 @@ def ensure_install_journal(paths: Paths) -> dict[str, object]:
         shortcut_state = baseline.get("desktop_shortcut")
         shortcut_state = shortcut_state if isinstance(shortcut_state, dict) else {}
         backup_dir = paths.root / "backups"
-        for label, shortcut in (
-            ("primary", desktop_shortcut_path()),
-            ("legacy", legacy_desktop_shortcut_path()),
-        ):
+        for shortcut in desktop_shortcut_paths():
+            label = shortcut.name
             if shortcut.exists():
                 backup_dir.mkdir(parents=True, exist_ok=True)
                 backup = backup_dir / f"desktop-{label}.lnk"
@@ -2570,11 +2567,22 @@ def desktop_shortcut_path() -> Path:
                 desktop = Path(desktop_buffer.value)
         except Exception:
             pass
-    return desktop / "Claude Code + DeepSeek.lnk"
+    return desktop / "Claude Code + DeepSeek 配置器.lnk"
 
 
 def legacy_desktop_shortcut_path() -> Path:
     return desktop_shortcut_path().with_name("Claude Code + DeepSeek 一键配置器.lnk")
+
+
+def desktop_shortcut_paths() -> list[Path]:
+    """All desktop shortcut names the app owns/cleans (new primary + historical names)."""
+    primary = desktop_shortcut_path()
+    names = {
+        primary.name,                                   # 新主名: Claude Code + DeepSeek 配置器.lnk
+        "Claude Code + DeepSeek.lnk",                   # 上一版主名(现退役，需清理)
+        "Claude Code + DeepSeek 一键配置器.lnk",        # 最旧 legacy(需清理)
+    }
+    return [primary.with_name(n) for n in sorted(names)]
 
 
 def create_desktop_shortcut(executable: str, arguments: str = "") -> bool:
@@ -2663,7 +2671,11 @@ def check_updates(paths: Paths, timeout: float = 8.0) -> dict[str, object]:
             metadata = _fetch_json(url, timeout)
             tags = metadata.get("dist-tags")
             tags = tags if isinstance(tags, dict) else {}
-            latest_claude = str(tags.get("stable") or tags.get("latest") or "")
+            stable = str(tags.get("stable") or "").strip()
+            latest = str(tags.get("latest") or "").strip()
+            latest_claude = max(
+                (v for v in (latest, stable) if v), key=_version_key, default=""
+            )
             if latest_claude:
                 registry_used = NPM_REGISTRIES[name]
                 break
@@ -3286,10 +3298,8 @@ def rollback_owned_components(paths: Paths, state: dict[str, object]) -> None:
 
 def _restore_desktop_shortcuts(state: dict[str, object]) -> None:
     baseline = _ownership_baseline(state, "desktop_shortcut")
-    for label, shortcut in (
-        ("primary", desktop_shortcut_path()),
-        ("legacy", legacy_desktop_shortcut_path()),
-    ):
+    for shortcut in desktop_shortcut_paths():
+        label = shortcut.name
         existed = bool(baseline.get(f"{label}_existed"))
         backup = Path(str(baseline.get(f"{label}_backup") or ""))
         if existed and backup.is_file():
@@ -3308,11 +3318,8 @@ def verify_uninstall_outcome(paths: Paths, state: dict[str, object]) -> None:
         remaining.append("Windows 凭据管理器中的代理令牌")
 
     baseline = _ownership_baseline(state, "desktop_shortcut")
-    for label, shortcut in (
-        ("primary", desktop_shortcut_path()),
-        ("legacy", legacy_desktop_shortcut_path()),
-    ):
-        if not baseline.get(f"{label}_existed") and shortcut.exists():
+    for shortcut in desktop_shortcut_paths():
+        if not baseline.get(f"{shortcut.name}_existed") and shortcut.exists():
             remaining.append(str(shortcut))
 
     if os.name == "nt":
@@ -3537,7 +3544,10 @@ def install_all(
         })
         if not create_desktop_shortcut(str(configurator or sys.executable)):
             raise InstallError("无法在当前用户桌面创建启动快捷方式，请检查桌面目录权限后重试")
-        legacy_desktop_shortcut_path().unlink(missing_ok=True)
+        primary = desktop_shortcut_path()
+        for other in desktop_shortcut_paths():
+            if other != primary:
+                other.unlink(missing_ok=True)
         record_owned_component(paths, "desktop_shortcut", {
             "installed_by_app": True,
             "status": "complete",

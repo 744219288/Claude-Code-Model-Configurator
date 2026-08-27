@@ -1,0 +1,10 @@
+V2.9.6 仅供验证测试，EXE 尚未使用正式发布证书签名。
+
+请核对同目录 SHA256SUMS，只在隔离测试电脑或虚拟机运行。SmartScreen 提示属于未签名测试构建的预期现象；不要关闭 Windows 安全功能。
+
+验收重点：
+1. 电脑不预装 Git、Node、npm、Python、Claude Code。
+2. 整个 ZIP 完整解压，EXE 与 offline 同级。
+3. 输入真实 DeepSeek Key 后能自动安装、API 测试、启动 Claude 对话。
+4. 重启电脑后桌面入口和新终端 claude 命令仍可用。
+5. 完整卸载后配置器新增目录、凭据、PATH 入口和快捷方式被清理。
