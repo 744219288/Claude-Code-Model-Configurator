@@ -33,10 +33,13 @@ from .credentials import (
     delete_saved_credentials, read_api_key, read_proxy_token,
     write_api_key, write_proxy_token,
 )
+from .providers import (
+    DEFAULT_PROVIDER_ID, PROVIDERS, get_model, get_provider,
+)
 
 
 APP_NAME = "ClaudeDeepSeekConfigurator"
-APP_VERSION = "2.9.6"
+APP_VERSION = "3.1.1"
 PYTHON_VERSION = "3.12.10"
 PYTHON_URL = f"https://www.python.org/ftp/python/{PYTHON_VERSION}/python-{PYTHON_VERSION}-amd64.exe"
 LITELLM_VERSION = "1.80.11"
@@ -53,8 +56,8 @@ NODE_VERSION = "22.23.2"
 NODE_ARCHIVE = f"node-v{NODE_VERSION}-win-x64.zip"
 GIT_VERSION = "2.55.0.5"
 GIT_ARCHIVE = f"PortableGit-{GIT_VERSION}-64-bit.7z.exe"
-SUPPORTED_MODELS = {"deepseek-v4-flash", "deepseek-v4-pro[1m]"}
-DEFAULT_MODEL = "deepseek-v4-flash"
+SUPPORTED_MODELS = {model.id for provider in PROVIDERS.values() for model in provider.models}
+DEFAULT_MODEL = get_provider(DEFAULT_PROVIDER_ID).default_model
 DEFAULT_REASONING_MODEL = "deepseek-v4-pro[1m]"
 # DeepSeek V4 系列（flash 与 pro）官方上下文窗口均为 1M tokens。
 # Claude Code 不认识这些自定义模型名时会保守假定 200k 窗口并做自动压缩，
@@ -67,6 +70,9 @@ GATEWAY_ENV_NAMES = (
     "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL",
     "CLAUDE_CODE_SUBAGENT_MODEL", "CLAUDE_CODE_EFFORT_LEVEL",
     "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW", "CLAUDE_CODE_MAX_CONTEXT_TOKENS",
+    "CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "API_TIMEOUT_MS",
 )
 NPM_PACKAGE = "@anthropic-ai/claude-code"
 NPM_REGISTRIES = {
@@ -151,8 +157,15 @@ def offline_root(paths: Paths | None = None) -> Path:
         application_dir() / "offline",
     ]
     for candidate in candidates:
-        if candidate is not None and candidate.joinpath(OFFLINE_MANIFEST).is_file():
-            return candidate
+        if candidate is None:
+            continue
+        try:
+            if candidate.joinpath(OFFLINE_MANIFEST).is_file():
+                return candidate
+        except OSError:
+            # A locked-down Windows profile may deny reads to a stale program
+            # directory. Continue to the portable/source payload instead.
+            continue
     # Return the adjacent path for actionable missing-payload diagnostics.
     return application_dir() / "offline"
 
@@ -313,7 +326,7 @@ def offline_asset_summary(root: Path | None = None) -> str:
     git_text = f"已内置 PortableGit {GIT_VERSION}" if bundled_git_archive(root) else "缺失"
     return (
         f"Git Bash：{git_text}；npm 运行环境：{node_text}；"
-        "DeepSeek：Anthropic 接口直连；Claude Code：稳定版多源回退；VS Code：可选联网"
+        "国产模型：Anthropic 兼容接口直连；Claude Code：稳定版多源回退；VS Code：可选联网"
     )
 
 
@@ -1010,13 +1023,20 @@ def _probe_url(url: str, timeout: float = 5.0, proxy_url: str = "") -> dict[str,
         }
 
 
-def probe_install_sources(timeout: float = 5.0, proxy_url: str = "") -> dict[str, dict[str, object]]:
+def probe_install_sources(
+    timeout: float = 5.0, proxy_url: str = "", provider_id: str = DEFAULT_PROVIDER_ID,
+) -> dict[str, dict[str, object]]:
     """Probe independent sources concurrently; results guide ordering but never prove a download."""
+    provider = get_provider(provider_id)
+    targets = dict(NETWORK_TARGETS)
+    targets["deepseek" if provider_id == DEFAULT_PROVIDER_ID else "provider"] = provider.base_url
+    if provider_id != DEFAULT_PROVIDER_ID:
+        targets.pop("deepseek", None)
     results: dict[str, dict[str, object]] = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(NETWORK_TARGETS)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(targets)) as executor:
         pending = {
             executor.submit(_probe_url, url, timeout, proxy_url): name
-            for name, url in NETWORK_TARGETS.items()
+            for name, url in targets.items()
         }
         for future in concurrent.futures.as_completed(pending):
             name = pending[future]
@@ -1036,13 +1056,18 @@ def probe_install_sources(timeout: float = 5.0, proxy_url: str = "") -> dict[str
     return results
 
 
-def install_source_summary(results: dict[str, dict[str, object]]) -> str:
+def install_source_summary(
+    results: dict[str, dict[str, object]], provider_label: str = "DeepSeek",
+) -> str:
     labels = {
         "native": "Anthropic 官方", "npm_mirror": "npm 国内镜像",
-        "npm_official": "npm 官方", "winget": "WinGet", "deepseek": "DeepSeek",
+        "npm_official": "npm 官方", "winget": "WinGet",
+        "deepseek": "DeepSeek", "provider": provider_label,
     }
     parts = []
-    for name in ("native", "npm_mirror", "npm_official", "winget", "deepseek"):
+    names = ("native", "npm_mirror", "npm_official", "winget")
+    names += ("provider",) if "provider" in results else ("deepseek",)
+    for name in names:
         item = results.get(name, {})
         if item.get("usable"):
             latency = int(item.get("latency_ms") or 0)
@@ -1898,31 +1923,43 @@ general_settings:
     paths.config.write_text(content, encoding="utf-8")
 
 
-def gateway_environment(model: str, api_key: str) -> dict[str, str]:
-    if model not in SUPPORTED_MODELS:
-        raise InstallError(f"不支持的 DeepSeek 模型：{model}")
-    return {
-        "ANTHROPIC_BASE_URL": DEEPSEEK_ANTHROPIC_URL,
+def gateway_environment(
+    model: str, api_key: str, provider_id: str = DEFAULT_PROVIDER_ID,
+) -> dict[str, str]:
+    """Build a clean per-process environment for one curated provider/model."""
+    if not api_key:
+        raise InstallError("API Key 不能为空")
+    try:
+        provider = get_provider(provider_id)
+        profile = get_model(provider_id, model)
+    except ValueError as exc:
+        raise InstallError(str(exc)) from exc
+    values = {
+        "ANTHROPIC_BASE_URL": provider.base_url,
         "ANTHROPIC_AUTH_TOKEN": api_key,
-        "ANTHROPIC_MODEL": model,
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": DEFAULT_REASONING_MODEL,
-        "ANTHROPIC_DEFAULT_SONNET_MODEL": DEFAULT_REASONING_MODEL,
-        "ANTHROPIC_DEFAULT_HAIKU_MODEL": DEFAULT_MODEL,
-        "CLAUDE_CODE_SUBAGENT_MODEL": DEFAULT_MODEL,
-        "CLAUDE_CODE_EFFORT_LEVEL": "max",
-        # 这两个变量一起确保 claude 用真实窗口而不是对未知模型名猜 200k：
-        # - MAX_CONTEXT_TOKENS 显式给出 DeepSeek V4 的真实 1M 窗口。
-        # - DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT 是兜底，取消仅因模型名
-        #   未被识别而施加的窗口假设，交由 API 侧处理。
-        "CLAUDE_CODE_MAX_CONTEXT_TOKENS": str(DEEPSEEK_CONTEXT_TOKENS),
-        "CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT": "1",
+        "ANTHROPIC_MODEL": profile.id,
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": profile.opus_model,
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": profile.sonnet_model,
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": profile.haiku_model,
+        "CLAUDE_CODE_SUBAGENT_MODEL": profile.subagent_model,
+        "CLAUDE_CODE_MAX_CONTEXT_TOKENS": str(profile.context_tokens),
+        **provider.extra_environment,
     }
+    if profile.auto_compact_window:
+        values["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(profile.auto_compact_window)
+    if profile.effort_level:
+        values["CLAUDE_CODE_EFFORT_LEVEL"] = profile.effort_level
+    return values
 
 
-def set_user_environment(model: str, _unused_token: str = "") -> None:
+def set_user_environment(
+    model: str, _unused_token: str = "", provider_id: str = DEFAULT_PROVIDER_ID,
+) -> None:
     """Compatibility no-op: V2.9.3 no longer persists gateway credentials or routing."""
-    if model not in SUPPORTED_MODELS:
-        raise InstallError(f"不支持的 DeepSeek 模型：{model}")
+    try:
+        get_model(provider_id, model)
+    except ValueError as exc:
+        raise InstallError(str(exc)) from exc
 
 
 def save_state(
@@ -1930,11 +1967,17 @@ def save_state(
     terminal_launcher: str = "", configurator: str = "",
     environment_backup: dict[str, str | None] | None = None,
     git_bash: str = "",
+    provider_id: str = DEFAULT_PROVIDER_ID,
 ) -> None:
+    try:
+        provider = get_provider(provider_id)
+    except ValueError as exc:
+        raise InstallError(str(exc)) from exc
     data = load_state(paths)
     data.update({
         "model": model, "python": python, "claude": claude, "code": code,
-        "proxy_url": "", "gateway_url": DEEPSEEK_ANTHROPIC_URL,
+        "provider": provider_id, "provider_label": provider.label,
+        "proxy_url": "", "gateway_url": provider.base_url,
         "connection_mode": "direct-anthropic", "terminal_launcher": terminal_launcher,
         "configurator": configurator,
         "git_bash": git_bash,
@@ -2170,6 +2213,11 @@ def _matches_configurator_environment(name: str, value: str, state: dict[str, ob
         "ANTHROPIC_DEFAULT_HAIKU_MODEL": {DEFAULT_MODEL},
         "CLAUDE_CODE_SUBAGENT_MODEL": {DEFAULT_MODEL},
         "CLAUDE_CODE_EFFORT_LEVEL": {"max"},
+        "CLAUDE_CODE_AUTO_COMPACT_WINDOW": {"786432", "983616", "1000000"},
+        "CLAUDE_CODE_MAX_CONTEXT_TOKENS": {"200000", "983616", "1000000"},
+        "CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT": {"1"},
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": {"1"},
+        "API_TIMEOUT_MS": {"3000000"},
     }
     if name == "ANTHROPIC_AUTH_TOKEN":
         return bool((token and value == token) or value.startswith("sk-local-"))
@@ -2456,50 +2504,76 @@ def proxy_log_tail(paths: Paths, api_key: str = "") -> str:
     return "代理日志末尾：\n" + "\n".join(lines[-12:]) if lines else ""
 
 
-def classify_api_response(status: int, body: str) -> tuple[bool, str]:
+def classify_api_response(
+    status: int, body: str, provider_label: str = "DeepSeek",
+) -> tuple[bool, str]:
     lowered = body.lower()
     if status < 400:
-        return True, "连接成功，DeepSeek API 可用"
+        return True, f"连接成功，{provider_label} API 可用"
     balance_markers = ("insufficient balance", "余额不足", "402")
     if any(marker in lowered for marker in balance_markers):
         return True, "连接成功，但 API 余额不足"
     if status in (401, 403) or "authentication" in lowered or "invalid api key" in lowered:
         return False, "连接失败：API Key 无效或没有权限"
-    return False, f"连接失败：DeepSeek 返回 HTTP {status}"
+    model_markers = ("model_not_found", "model not found", "无权访问该模型", "模型不存在")
+    if status in (400, 404) and any(marker in lowered for marker in model_markers):
+        return False, f"连接失败：{provider_label} 当前 Key 无权使用所选模型，或模型名称已变化"
+    return False, f"连接失败：{provider_label} 返回 HTTP {status}"
 
 
-def test_connection(model: str) -> tuple[bool, str]:
-    api_key = read_api_key()
+def test_connection(
+    model: str, provider_id: str = DEFAULT_PROVIDER_ID,
+) -> tuple[bool, str]:
+    try:
+        provider = get_provider(provider_id)
+        profile = get_model(provider_id, model)
+    except ValueError as exc:
+        return False, str(exc)
+    api_key = read_api_key(provider_id)
     if not api_key:
-        return False, "请先填写并保存 DeepSeek API Key"
-    if model not in SUPPORTED_MODELS:
-        return False, f"不支持的 DeepSeek 模型：{model}"
-    api_model = "deepseek-v4-pro" if model.startswith("deepseek-v4-pro") else "deepseek-v4-flash"
-    payload = json.dumps({"model": api_model, "messages": [{"role": "user", "content": "Hi"}], "max_tokens": 1}).encode()
-    endpoint = f"{DEEPSEEK_BASE_URL}/chat/completions"
+        return False, f"请先填写并保存 {provider.key_label}"
+    payload = json.dumps({
+        "model": profile.api_model,
+        "messages": [{"role": "user", "content": "Hi"}],
+        "max_tokens": 1,
+    }).encode()
+    endpoint = provider.base_url.rstrip("/") + "/v1/messages"
     request = urllib.request.Request(
         endpoint, data=payload,
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}, method="POST",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        },
+        method="POST",
     )
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
-            return classify_api_response(response.status, response.read().decode("utf-8", "replace"))
+            return classify_api_response(
+                response.status, response.read().decode("utf-8", "replace"), provider.label,
+            )
     except urllib.error.HTTPError as exc:
-        return classify_api_response(exc.code, exc.read().decode("utf-8", "replace"))
+        return classify_api_response(
+            exc.code, exc.read().decode("utf-8", "replace"), provider.label,
+        )
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         return False, f"连接失败：请检查网络设置（{exc}）"
 
 
 def launch_claude(paths: Paths) -> None:
     state = load_state(paths)
+    provider_id = str(state.get("provider") or DEFAULT_PROVIDER_ID)
     claude = state.get("claude") or command_path("claude")
     if not claude or not Path(claude).exists():
         raise InstallError("未找到 Claude Code，请先完成一键安装")
-    api_key = read_api_key()
+    api_key = read_api_key(provider_id)
     if not api_key:
-        raise InstallError("未找到已保存的 DeepSeek API Key，请先完成配置")
+        raise InstallError("未找到当前模型厂商的 API Key，请先完成配置")
     env = environment_with_git(paths)
-    env.update(gateway_environment(str(state.get("model") or DEFAULT_MODEL), api_key))
+    env.update(gateway_environment(
+        str(state.get("model") or get_provider(provider_id).default_model), api_key, provider_id,
+    ))
     commands = claude_terminal_commands(claude)
     last_error: OSError | None = None
     for command, flags in commands:
@@ -2514,14 +2588,17 @@ def launch_claude(paths: Paths) -> None:
 def run_claude_inline(paths: Paths, arguments: list[str] | None = None) -> int:
     """Run Claude in the current terminal and inject the API key only into its child."""
     state = load_state(paths)
+    provider_id = str(state.get("provider") or DEFAULT_PROVIDER_ID)
     claude = str(state.get("claude") or command_path("claude") or "")
     if not claude or not Path(claude).exists():
         raise InstallError("未找到 Claude Code，请先完成一键安装")
-    api_key = read_api_key()
+    api_key = read_api_key(provider_id)
     if not api_key:
-        raise InstallError("未找到已保存的 DeepSeek API Key，请先完成配置")
+        raise InstallError("未找到当前模型厂商的 API Key，请先完成配置")
     env = environment_with_git(paths)
-    env.update(gateway_environment(str(state.get("model") or DEFAULT_MODEL), api_key))
+    env.update(gateway_environment(
+        str(state.get("model") or get_provider(provider_id).default_model), api_key, provider_id,
+    ))
     try:
         result = subprocess.run([claude, *(arguments or [])], env=env, check=False)
     except OSError as exc:
@@ -2547,14 +2624,17 @@ def claude_terminal_commands(claude: str) -> list[tuple[list[str], int]]:
 
 def launch_vscode(paths: Paths) -> None:
     state = load_state(paths)
+    provider_id = str(state.get("provider") or DEFAULT_PROVIDER_ID)
     code = state.get("code") or command_path("code")
     if not code or not Path(code).exists():
         raise InstallError("未找到 VS Code，请先完成一键安装")
-    api_key = read_api_key()
+    api_key = read_api_key(provider_id)
     if not api_key:
-        raise InstallError("未找到已保存的 DeepSeek API Key，请先完成配置")
+        raise InstallError("未找到当前模型厂商的 API Key，请先完成配置")
     env = environment_with_git(paths)
-    env.update(gateway_environment(str(state.get("model") or DEFAULT_MODEL), api_key))
+    env.update(gateway_environment(
+        str(state.get("model") or get_provider(provider_id).default_model), api_key, provider_id,
+    ))
     subprocess.Popen([code, str(Path.home())], env=env, creationflags=subprocess.CREATE_NO_WINDOW)
 
 
@@ -2567,7 +2647,7 @@ def desktop_shortcut_path() -> Path:
                 desktop = Path(desktop_buffer.value)
         except Exception:
             pass
-    return desktop / "Claude Code + DeepSeek 配置器.lnk"
+    return desktop / "Claude Code 国产模型配置器.lnk"
 
 
 def legacy_desktop_shortcut_path() -> Path:
@@ -2578,7 +2658,8 @@ def desktop_shortcut_paths() -> list[Path]:
     """All desktop shortcut names the app owns/cleans (new primary + historical names)."""
     primary = desktop_shortcut_path()
     names = {
-        primary.name,                                   # 新主名: Claude Code + DeepSeek 配置器.lnk
+        primary.name,
+        "Claude Code + DeepSeek 配置器.lnk",           # V2.9.x 主名
         "Claude Code + DeepSeek.lnk",                   # 上一版主名(现退役，需清理)
         "Claude Code + DeepSeek 一键配置器.lnk",        # 最旧 legacy(需清理)
     }
@@ -2601,7 +2682,7 @@ def create_desktop_shortcut(executable: str, arguments: str = "") -> bool:
         "$s.Arguments=$env:CLAUDE_DEEPSEEK_SHORTCUT_ARGUMENTS;"
         "$s.WorkingDirectory=(Split-Path $env:CLAUDE_DEEPSEEK_SHORTCUT_TARGET);"
         "$s.IconLocation=$env:CLAUDE_DEEPSEEK_SHORTCUT_TARGET+',0';"
-        "$s.Description='打开 Claude Code + DeepSeek 配置器';$s.Save()"
+        "$s.Description='打开 Claude Code 国产模型配置器';$s.Save()"
     )
     try:
         result = run_command(
@@ -2615,14 +2696,22 @@ def create_desktop_shortcut(executable: str, arguments: str = "") -> bool:
 
 def system_status(paths: Paths) -> dict[str, object]:
     state = load_state(paths)
+    provider_id = str(state.get("provider") or DEFAULT_PROVIDER_ID)
+    try:
+        provider = get_provider(provider_id)
+    except ValueError:
+        provider_id = DEFAULT_PROVIDER_ID
+        provider = get_provider(provider_id)
     payload_ok, payload_detail = verify_offline_payload(offline_root(paths))
     return {
         "version": APP_VERSION,
         "windows": windows_compatibility_label(),
         "architecture": platform.machine(),
-        "api_key_saved": bool(read_api_key()),
+        "provider": provider_id,
+        "provider_label": provider.label,
+        "api_key_saved": bool(read_api_key(provider_id)),
         "connection_mode": state.get("connection_mode", "direct-anthropic"),
-        "gateway_url": state.get("gateway_url", DEEPSEEK_ANTHROPIC_URL),
+        "gateway_url": state.get("gateway_url", provider.base_url),
         "model": state.get("model", "尚未配置"),
         "git_ready": bool(find_git_bash(paths)),
         "claude_ready": bool(state.get("claude") or command_path("claude")),
@@ -2705,6 +2794,10 @@ def check_updates(paths: Paths, timeout: float = 8.0) -> dict[str, object]:
             app_update["message"] = f"检查失败：{_clean_progress_line(str(exc))}"
 
     managed = claude_component.get("method") == "managed-npm" and bool(claude_component.get("installed_by_app"))
+    try:
+        active_provider = get_provider(str(state.get("provider") or DEFAULT_PROVIDER_ID))
+    except ValueError:
+        active_provider = get_provider(DEFAULT_PROVIDER_ID)
     return {
         "configurator": app_update,
         "claude": {
@@ -2720,7 +2813,7 @@ def check_updates(paths: Paths, timeout: float = 8.0) -> dict[str, object]:
         "runtime": {
             "node": NODE_VERSION,
             "git": GIT_VERSION,
-            "gateway": "DeepSeek Anthropic 直连",
+            "gateway": f"{active_provider.label} Anthropic 直连",
             "message": "Git 与 Node.js 均为隔离、哈希锁定的本地组件",
         },
         "errors": errors,
@@ -2835,9 +2928,12 @@ def export_diagnostics(paths: Paths, destination: Path) -> Path:
     """Export a support archive without credentials, tokens, or raw environment values."""
     destination = destination.with_suffix(".zip") if destination.suffix.lower() != ".zip" else destination
     destination.parent.mkdir(parents=True, exist_ok=True)
-    api_key = read_api_key() or ""
-    proxy_token = read_proxy_token() or ""
     state = load_state(paths)
+    api_keys = tuple(
+        key for provider_id in PROVIDERS
+        if (key := read_api_key(provider_id))
+    )
+    proxy_token = read_proxy_token() or ""
     safe_state = {
         name: value for name, value in state.items()
         if name not in {"environment_backup", "ownership"}
@@ -2859,7 +2955,8 @@ def export_diagnostics(paths: Paths, destination: Path) -> Path:
         raw_log = paths.log.read_text(encoding="utf-8", errors="replace")
     except OSError:
         raw_log = "代理日志不存在。"
-    safe_log = redact(raw_log, (api_key, proxy_token))
+    secrets_to_redact = (*api_keys, proxy_token)
+    safe_log = redact(raw_log, secrets_to_redact)
     safe_log = re.sub(r"(?i)(authorization|api[_ -]?key|master[_ -]?key)(\s*[:=]\s*)\S+", r"\1\2***", safe_log)
     python_logs: dict[str, str] = {}
     for log_path in paths.root.glob("python-*.log") if paths.root.exists() else ():
@@ -2867,7 +2964,7 @@ def export_diagnostics(paths: Paths, destination: Path) -> Path:
             content = log_path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        content = redact(content, (api_key, proxy_token))
+        content = redact(content, secrets_to_redact)
         python_logs[log_path.name + ".txt"] = content
     if not python_logs:
         python_logs["python-install.log.txt"] = "Python 安装、修复或卸载日志不存在。"
@@ -2886,7 +2983,7 @@ def export_diagnostics(paths: Paths, destination: Path) -> Path:
         archive.writestr("proxy.log.txt", safe_log)
         for name, content in python_logs.items():
             archive.writestr(name, content)
-        archive.writestr("README.txt", "此诊断包不包含 DeepSeek API Key、代理访问令牌或用户环境变量值。\n")
+        archive.writestr("README.txt", "此诊断包不包含任何模型厂商 API Key、代理访问令牌或用户环境变量值。\n")
     return destination
 
 
@@ -3312,8 +3409,9 @@ def _restore_desktop_shortcuts(state: dict[str, object]) -> None:
 def verify_uninstall_outcome(paths: Paths, state: dict[str, object]) -> None:
     """Refuse to claim success while app-controlled persistent state remains."""
     remaining: list[str] = []
-    if read_api_key() is not None:
-        remaining.append("Windows 凭据管理器中的 DeepSeek API Key")
+    for provider_id, provider in PROVIDERS.items():
+        if read_api_key(provider_id) is not None:
+            remaining.append(f"Windows 凭据管理器中的 {provider.label} API Key")
     if read_proxy_token() is not None:
         remaining.append("Windows 凭据管理器中的代理令牌")
 
@@ -3360,7 +3458,7 @@ def uninstall_all(paths: Paths, remove_confirmed_legacy_external: bool = False) 
         raise InstallError("无法确认或停止配置器管理的 LiteLLM 代理，已停止卸载以避免误杀其他程序")
     rollback_owned_components(paths, state)
     remove_user_environment(paths)
-    delete_saved_credentials()
+    delete_saved_credentials(PROVIDERS)
     _restore_desktop_shortcuts(state)
     verify_uninstall_outcome(paths, state)
     executable = Path(sys.executable).resolve()
@@ -3377,8 +3475,14 @@ def uninstall_all(paths: Paths, remove_confirmed_legacy_external: bool = False) 
 def install_all(
     paths: Paths, api_key: str, model: str, progress: Progress,
     options: InstallOptions | None = None,
+    provider_id: str = DEFAULT_PROVIDER_ID,
 ) -> None:
     options = options or InstallOptions()
+    try:
+        provider = get_provider(provider_id)
+        get_model(provider_id, model)
+    except ValueError as exc:
+        raise InstallError(str(exc)) from exc
     progress("系统检查", "正在检查 Windows 版本和处理器架构")
     if not is_supported_windows():
         raise InstallError("本配置器仅支持 Windows 10/11")
@@ -3386,9 +3490,7 @@ def install_all(
         raise InstallError("当前通用版支持 Windows 10/11 x64；ARM64 和 32 位系统请勿继续安装")
     key = api_key.strip()
     if not key:
-        raise InstallError("请输入 DeepSeek API Key")
-    if model not in SUPPORTED_MODELS:
-        raise InstallError("不支持的模型")
+        raise InstallError(f"请输入 {provider.key_label}")
     free = check_install_location(paths)
     progress("系统检查", f"{windows_compatibility_label()} 环境检查通过 · 系统盘可用 {free / 1024**3:.1f} GB")
     if getattr(sys, "frozen", False):
@@ -3399,13 +3501,17 @@ def install_all(
     previous_installed = ownership.get("installed")
     previous_installed = previous_installed if isinstance(previous_installed, dict) else {}
     progress("离线组件", offline_asset_summary(offline_root(paths)))
-    progress("安全保存", "正在写入 Windows 凭据管理器")
-    write_api_key(key)
-    progress("直连网关", "DeepSeek Anthropic 兼容接口已启用，无需 Python、LiteLLM 或本机代理")
+    progress("安全保存", f"正在将 {provider.label} 密钥写入 Windows 凭据管理器")
+    # Keep the legacy one-argument DeepSeek path for V2.9.x compatibility.
+    if provider_id == DEFAULT_PROVIDER_ID:
+        write_api_key(key)
+    else:
+        write_api_key(key, provider_id)
+    progress("直连网关", f"{provider.label} Anthropic 兼容接口已启用，无需本机代理")
     git_bash = ensure_git(paths, progress)
-    progress("安装源检测", "正在并行检测国内镜像、官方源、WinGet 与 DeepSeek 连通性")
-    probes = probe_install_sources(timeout=5.0, proxy_url=options.proxy_url)
-    progress("安装源检测", install_source_summary(probes))
+    progress("安装源检测", f"正在并行检测国内镜像、官方源、WinGet 与 {provider.label} 连通性")
+    probes = probe_install_sources(timeout=5.0, proxy_url=options.proxy_url, provider_id=provider_id)
+    progress("安装源检测", install_source_summary(probes, provider.label))
     state = load_state(paths)
     state["last_source_probe"] = {
         name: {
@@ -3520,7 +3626,7 @@ def install_all(
             "installed_by_app": previous_extension_owned,
             "status": "skipped", "id": VSCODE_EXTENSION,
         })
-    progress("配置", "正在准备 DeepSeek Anthropic 直连启动环境")
+    progress("配置", f"正在准备 {provider.label} Anthropic 直连启动环境")
     environment_backup = capture_user_environment(paths)
     record_environment_backup(paths, environment_backup)
     # Remove V2.7-V2.9.2 persistent proxy routing. V2.9.3 injects the API key
@@ -3531,12 +3637,12 @@ def install_all(
     configurator = install_stable_configurator(paths)
     terminal_launcher = install_claude_terminal_launcher(paths, claude, configurator)
     record_added_user_path_entries(paths)
-    progress("连接测试", "正在验证 DeepSeek API")
-    ok, message = test_connection(model)
+    progress("连接测试", f"正在验证 {provider.label} API")
+    ok, message = test_connection(model, provider_id)
     if not ok:
         raise InstallError(message)
     if getattr(sys, "frozen", False):
-        progress("桌面入口", "正在创建 Claude Code + DeepSeek 快捷方式")
+        progress("桌面入口", "正在创建 Claude Code + 国产模型快捷方式")
         record_owned_component(paths, "desktop_shortcut", {
             "installed_by_app": True,
             "status": "pending",
@@ -3556,6 +3662,6 @@ def install_all(
     save_state(
         paths, model, "", claude, code,
         str(terminal_launcher or ""), str(configurator or ""),
-        environment_backup, git_bash,
+        environment_backup, git_bash, provider_id=provider_id,
     )
     progress("完成", message)

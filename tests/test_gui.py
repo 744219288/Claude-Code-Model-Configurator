@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import inspect
 import unittest
+from pathlib import Path
 
-from installer.gui import App, INSTALL_TASKS, resource_path
+from installer.gui import App, INSTALL_TASKS, PROVIDER_GROUPS, resource_path
+from installer.providers import PROVIDERS
 
 
 class FakeWidget:
@@ -83,6 +86,50 @@ class DynamicProgressTests(unittest.TestCase):
             [item[0] for item in INSTALL_TASKS].index("安装源检测"),
             [item[0] for item in INSTALL_TASKS].index("Claude Code"),
         )
+
+    def test_all_existing_action_buttons_are_kept_in_gui(self):
+        source_path = Path(inspect.getsourcefile(App) or "")
+        source = source_path.read_text(encoding="utf-8")
+        for label in (
+            "开始安装并配置", "测试连接", "启动 Claude Code", "启动 VS Code",
+            "检查更新", "状态", "诊断", "卸载",
+        ):
+            with self.subTest(label=label):
+                self.assertIn(label, source)
+
+    def test_provider_grouping_preserves_every_backend_provider(self):
+        grouped = {
+            provider_id
+            for _brand_id, _label, provider_ids in PROVIDER_GROUPS
+            for provider_id in provider_ids
+        }
+        self.assertEqual(grouped, set(PROVIDERS))
+        self.assertEqual(App._brand_for_provider("aliyun-token"), "aliyun")
+        self.assertEqual(App._brand_for_provider("deepseek"), "deepseek")
+
+    def test_main_content_has_a_real_vertical_scrollbar(self):
+        source_path = Path(inspect.getsourcefile(App) or "")
+        source = source_path.read_text(encoding="utf-8")
+        self.assertIn("class ModernScrollbar", source)
+        self.assertIn("yscrollcommand=self.content_scrollbar.set", source)
+        self.assertIn('self.content_canvas.yview_scroll', source)
+
+    def test_template_visuals_use_real_brand_icon_and_circular_progress(self):
+        source_path = Path(inspect.getsourcefile(App) or "")
+        source = source_path.read_text(encoding="utf-8")
+        self.assertIn("image=self.app_icon_large", source)
+        self.assertIn("class ProgressRing", source)
+        self.assertIn("self.progress_ring = ProgressRing", source)
+
+    def test_v311_uses_antialiased_icons_and_official_vscode_asset(self):
+        self.assertTrue(resource_path("assets/ui/vscode.png").is_file())
+        self.assertTrue(resource_path("assets/ui/update.png").is_file())
+        self.assertTrue(resource_path("assets/ui/play-white.png").is_file())
+        source_path = Path(inspect.getsourcefile(App) or "")
+        source = source_path.read_text(encoding="utf-8")
+        self.assertIn("_render_progress_ring", source)
+        self.assertIn('self.ui_icons[name] = tk.PhotoImage', source)
+        self.assertNotIn("def _draw_icon", source)
 
 
 if __name__ == "__main__":

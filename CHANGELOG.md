@@ -1,24 +1,22 @@
 # Changelog
 
-## V2.9.6 - 2026-08-26（全新电脑直连修复）
+## V3.1.1 - 2026-08-28
 
-- **凭据管理修复**：凭据模块改用 `ctypes.WinDLL("Advapi32.dll", use_last_error=True)`，每次调用前清零、失败后立即读取；仅将 `ERROR_NOT_FOUND (1168)` 视为幂等删除成功，彻底消除“删除凭据失败，错误码 0”。
-- **离线资源修复**：冻结构建首跑校验相邻 `offline` 清单，并以原子方式复制到 `%LOCALAPPDATA%\Programs\ClaudeDeepSeekConfigurator\offline.new-*`，复制完成后再逐文件校验才切换，修复全新电脑上稳定副本缺资源、找不到受管理 Node.js 的问题。
-- **入口自包含**：稳定 EXE、完整离线资源与完整性 sidecar 同处程序根目录，桌面 / 终端入口不再依赖 ZIP、微信缓存或启动工作目录。
-- **直连架构不变**：继续直连 DeepSeek 官方 Anthropic 接口，无 Python / LiteLLM / 本地代理；内置 PortableGit 2.55.0.5 与 Node.js 22.23.2 隔离于配置器目录。
-- **安装选路优化**：安装优先 WinGet / Anthropic 原生，npm 回退解析 `stable/latest` 并确认 Windows x64 平台包同版本已发布才安装，规避 `@latest` 竞态。
-- **模型与凭据**：模型 `deepseek-v4-flash` / `deepseek-v4-pro[1m]`，清理旧代理环境变量，密钥仅注入子进程。
-- **质量**：自动化测试 98 项通过；发布仍须受信任代码签名，未签名测试包可能触发 SmartScreen。
+- 只精修界面，不改动安装、模型、凭据、更新和卸载业务逻辑。
+- 顶部与底部操作入口改用微软 Fluent System Icons，消除低分辨率 Canvas 自绘图标的锯齿与断线。
+- “启动 VS Code”使用 VS Code 官方品牌页面提供的稳定版图标资源。
+- 圆环进度改为高质量抗锯齿渲染，增加渐变进度、圆润端点和更克制的轨道。
+- 侧栏步骤节点改为抗锯齿图像，统一全局留白、灰阶、边框和 Apple 风格视觉层级。
 
-## V2.9.3
+## V3.1.0 - 2026-08-28
 
-- 修复 Windows 凭据 API 最后错误码丢失导致的“删除凭据失败，错误码 0”。
-- 修复稳定 EXE 未携带 offline 资源、在微信 / ZIP 临时路径运行后找不到受管理 Node.js。
-- 切换到 DeepSeek Anthropic 官方接口直连，移除新安装流程中的 Python / LiteLLM / 本地代理。
-- 内置 PortableGit 2.55.0.5 与 Node.js 22.23.2，支持无开发环境的新电脑。
-- npm 安装增加主包与 Windows x64 平台包同版本发布验证，拒绝不完整的 `@latest`。
-- 模型更新为 DeepSeek V4 Flash / V4 Pro 1M；密钥仅注入子进程。
-- 新增完整 payload 原子安装与二次校验，自动化测试增至 98 项。
+- 按 Fluent/Sun Valley 风格重构主窗口，保留原有全部功能与后端行为。
+- 新增固定顶部维护命令栏与固定底部运行/安装操作栏，窗口滚动时按钮仍可见。
+- 右侧内容区加入常驻纵向滚动条和鼠标滚轮支持，解决小窗口看不到进度与日志的问题。
+- 服务商改为四组紧凑分段选择，阿里云三种套餐使用二级联动，不再占用六张大卡片。
+- 模型改为紧凑列表，展示模型定位、推荐状态和长上下文标签。
+- 安装进度区整合总体进度、当前步骤、实时活动与可展开日志。
+- 版本提升为 V3.1.0。
 
 ## V2.9.2 - 2026-08-23
 
@@ -29,7 +27,7 @@
 - 普通错误弹窗升级为安装方案选择窗口，可切换国内镜像、官方 npm、官方原生、WinGet、检测到的代理或导出诊断。
 - VS Code 与 Anthropic 扩展改为默认不勾选的可选增强，安装失败不再阻断 Claude Code CLI 核心功能。
 - 新增“检查更新”入口：外部组件只提示，受管理 Claude Code 可按原来源更新并在失败时尝试恢复原版本；配置器自更新要求 HTTPS、SHA-256 和 Authenticode 发布者三重验证。
-- 受管理 Node/npm、npm 缓存、Claude 安装前 `pending` 记录及更新状态纳入完整卸载和失败回滚。
+- 受管理 Node/npm、npm缓存、Claude安装前 `pending` 记录及更新状态纳入完整卸载和失败回滚。
 - 桌面快捷方式改为打开配置器主界面，不再携带 `--launch-claude` 参数直接跳转终端；Claude Code 由用户在界面中主动启动。
 - 自动化测试增至 87 项，并完成一次强制模拟“无 Claude、无 Node、无 npm”的隔离目录 npm 国内镜像真实安装与版本验证。
 
@@ -93,3 +91,20 @@
 ## V2.7
 
 - 优先使用 Anthropic 官方原生 `claude.exe`，增加安全的 `claude.cmd` 入口与 52 项测试矩阵。
+# V2.9.3
+
+- 修复 Windows 凭据 API 最后错误码丢失导致的“删除凭据失败，错误码 0”。
+- 修复稳定 EXE 未携带 offline 资源、微信/ZIP 临时路径运行后找不到受管理 Node.js。
+- 切换到 DeepSeek Anthropic 官方接口直连，移除新安装流程中的 Python/LiteLLM/本地代理。
+- 内置 PortableGit 2.55.0.5 和 Node.js 22.23.2，支持无开发环境的新电脑。
+- npm 安装增加主包与 Windows x64 平台包同版本发布验证，拒绝不完整的 `@latest`。
+- 模型更新为 DeepSeek V4 Flash / V4 Pro 1M；密钥仅注入子进程。
+- 新增完整 payload 原子安装与二次校验，自动化测试增至 98 项。
+# V3.0.0-dev.1
+
+- 新增集中式国产模型厂商注册表，首批支持 DeepSeek、智谱 GLM、MiniMax 与阿里云百炼三类套餐入口。
+- GUI 新增厂商/模型联动选择，Key 标签和已保存凭据随厂商切换。
+- 每个厂商的 API Key 在 Windows 凭据管理器中隔离保存；DeepSeek 保留 V2.9.6 凭据目标以平滑升级。
+- 连接测试、Claude Code/VS Code 启动环境、状态页、诊断和卸载流程全部支持当前厂商。
+- 保持官方 Anthropic 兼容接口直连，不新增 Python、LiteLLM 或本地代理依赖。
+- 新增多厂商隔离与请求构造测试；全套 103 项自动化测试通过。

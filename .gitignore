@@ -12,3 +12,7 @@ source-v*/
 .env.*
 !.env.example
 
+# Large offline payloads are attached to GitHub Releases, not stored in Git history.
+offline/git/*.exe
+offline/node/*.zip
+

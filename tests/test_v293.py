@@ -70,11 +70,11 @@ class StableNpmPairTests(unittest.TestCase):
         calls = [
             subprocess.CompletedProcess([], 0, '{"stable":"2.1.231","latest":"2.1.232"}'),
             subprocess.CompletedProcess([], 1, "not found"),
-            subprocess.CompletedProcess([], 0, '"2.1.232"'),
+            subprocess.CompletedProcess([], 0, '"2.1.231"'),
         ]
         with mock.patch("installer.core.run_command", side_effect=calls):
             version = core.resolve_claude_npm_version("npm.cmd", "https://registry.example", {})
-        self.assertEqual(version, "2.1.232")
+        self.assertEqual(version, "2.1.231")
 
     def test_unsynchronised_npm_release_is_rejected(self):
         calls = [

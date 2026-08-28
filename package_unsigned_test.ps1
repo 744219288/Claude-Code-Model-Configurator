@@ -1,20 +1,20 @@
 ﻿$ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $OutputRoot = Split-Path -Parent $ProjectRoot
-$Exe = Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'dist-v296') -Filter '*.exe' | Select-Object -First 1
+$Exe = Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'dist-v311') -Filter '*.exe' | Select-Object -First 1
 $ManifestPath = Join-Path $ProjectRoot 'offline\manifest.json'
 $SbomPath = Join-Path $ProjectRoot 'SBOM.cdx.json'
-$TestStaging = Join-Path $ProjectRoot 'release-v296-unsigned'
-$SourceStaging = Join-Path $ProjectRoot 'source-v296'
-$TestZip = Join-Path $OutputRoot 'Claude-Code-DeepSeek-V2.9.6-全新电脑直连修复-未签名测试包.zip'
-$SourceZip = Join-Path $OutputRoot 'Claude-Code-DeepSeek-Configurator-V2.9.6-Secure-Source.zip'
+$TestStaging = Join-Path $ProjectRoot 'release-v311-unsigned'
+$SourceStaging = Join-Path $ProjectRoot 'source-v311'
+$TestZip = Join-Path $OutputRoot 'Claude-Code-国产模型配置器-V3.1.1-未签名测试包.zip'
+$SourceZip = Join-Path $OutputRoot 'Claude-Code-国产模型配置器-V3.1.1-可审计源码.zip'
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
-if (-not $Exe) { throw '未找到 dist-v296 中的 V2.9.6 EXE。' }
+if (-not $Exe) { throw '未找到 dist-v311 中的 V3.1.1 EXE。' }
 if ((Get-AuthenticodeSignature -LiteralPath $Exe.FullName).Status -eq 'Valid') {
     throw '当前 EXE 已有有效签名，请使用正式签名发布流程，不要生成未签名测试包。'
 }
-foreach ($Required in @($ManifestPath, $SbomPath, (Join-Path $ProjectRoot 'V2.9.6仅供测试-未签名.txt'))) {
+foreach ($Required in @($ManifestPath, $SbomPath, (Join-Path $ProjectRoot 'V3.1.1开发测试说明.txt'))) {
     if (-not (Test-Path -LiteralPath $Required -PathType Leaf)) { throw "缺少测试包文件：$Required" }
 }
 $Manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
@@ -40,17 +40,17 @@ function Reset-ProjectStaging([string]$Path) {
 }
 
 Reset-ProjectStaging $TestStaging
-Copy-Item -LiteralPath $Exe.FullName -Destination (Join-Path $TestStaging 'Claude-Code-DeepSeek-一键配置器.exe')
+Copy-Item -LiteralPath $Exe.FullName -Destination (Join-Path $TestStaging 'Claude-Code-国产模型配置器.exe')
 Copy-Item -LiteralPath (Join-Path $ProjectRoot 'offline') -Destination $TestStaging -Recurse
 foreach ($Name in @(
-    'V2.9.6仅供测试-未签名.txt', '微信发送说明.txt', '兼容性说明.txt',
-    '新电脑模拟测试报告.txt', 'V2.9.6全新电脑直连修复报告.md',
+    'V3.1.1开发测试说明.txt', '微信发送说明.txt', '兼容性说明.txt',
+    '新电脑模拟测试报告.txt', 'V3.1.1界面精修报告.md',
     'V2.9.1完整卸载热修复报告.md', 'CHANGELOG.md', 'SBOM.cdx.json'
 )) {
     Copy-Item -LiteralPath (Join-Path $ProjectRoot $Name) -Destination $TestStaging
 }
 $HashTargets = [ordered]@{
-    'Claude-Code-DeepSeek-一键配置器.exe' = Join-Path $TestStaging 'Claude-Code-DeepSeek-一键配置器.exe'
+    'Claude-Code-国产模型配置器.exe' = Join-Path $TestStaging 'Claude-Code-国产模型配置器.exe'
     'offline/manifest.json' = Join-Path $TestStaging 'offline\manifest.json'
     'offline/node/node-v22.23.2-win-x64.zip' = Join-Path $TestStaging 'offline\node\node-v22.23.2-win-x64.zip'
     'offline/git/PortableGit-2.55.0.5-64-bit.7z.exe' = Join-Path $TestStaging 'offline\git\PortableGit-2.55.0.5-64-bit.7z.exe'
@@ -64,7 +64,7 @@ if (Test-Path -LiteralPath $TestZip) { Remove-Item -LiteralPath $TestZip -Force 
 Compress-Archive -Path (Join-Path $TestStaging '*') -DestinationPath $TestZip -CompressionLevel Optimal
 
 Reset-ProjectStaging $SourceStaging
-foreach ($Directory in @('installer', 'hooks', 'tests', 'offline', 'tools', 'assets')) {
+foreach ($Directory in @('installer', 'hooks', 'tests', 'offline', 'tools', 'assets', 'design')) {
     Copy-Item -LiteralPath (Join-Path $ProjectRoot $Directory) -Destination $SourceStaging -Recurse
 }
 foreach ($Name in @(
@@ -74,10 +74,20 @@ foreach ($Name in @(
     'V2.8升级报告.md', 'V2.8.1新电脑运行热修复报告.md', 'V2.8.1干净部署实测结果.json',
     'V2.8.2终端体验热修复报告.md', 'V2.9完整回滚与桌面启动升级报告.md',
     'V2.9.1完整卸载热修复报告.md', 'V2.9.2国内网络增强升级报告.md',
-    'V2.9.6全新电脑直连修复报告.md', 'V2.9.6仅供测试-未签名.txt', 'SBOM.cdx.json'
+    'V2.9.6全新电脑直连修复报告.md', 'V3.0.0多模型改造报告.md',
+    'V3.1.0界面升级报告.md', 'V3.1.0开发测试说明.txt',
+    'V3.1.1界面精修报告.md', 'V3.1.1开发测试说明.txt', 'SBOM.cdx.json'
 )) {
     Copy-Item -LiteralPath (Join-Path $ProjectRoot $Name) -Destination $SourceStaging
 }
+$CacheDirectories = @(Get-ChildItem -LiteralPath $SourceStaging -Directory -Recurse -Force |
+    Where-Object { $_.Name -eq '__pycache__' } |
+    Sort-Object { $_.FullName.Length } -Descending)
+foreach ($CacheDirectory in $CacheDirectories) {
+    Remove-Item -LiteralPath $CacheDirectory.FullName -Recurse -Force
+}
+Get-ChildItem -LiteralPath $SourceStaging -File -Recurse -Filter '*.pyc' |
+    Remove-Item -Force
 if (Test-Path -LiteralPath $SourceZip) { Remove-Item -LiteralPath $SourceZip -Force }
 Compress-Archive -Path (Join-Path $SourceStaging '*') -DestinationPath $SourceZip -CompressionLevel Optimal
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import ctypes
 from ctypes import wintypes
+import re
+from typing import Iterable
 
 
 CRED_TYPE_GENERIC = 1
@@ -12,6 +14,7 @@ ERROR_SUCCESS = 0
 ERROR_NOT_FOUND = 1168
 API_KEY_TARGET = "ClaudeDeepSeekConfigurator/DeepSeekApiKey"
 PROXY_TOKEN_TARGET = "ClaudeDeepSeekConfigurator/ProxyMasterKey"
+PROVIDER_KEY_PREFIX = "ClaudeCNModelConfigurator/Provider"
 
 
 class CredentialError(RuntimeError):
@@ -113,17 +116,27 @@ def _delete_secret(target: str) -> None:
         raise CredentialError(f"删除凭据失败，Windows 错误码 {error}")
 
 
-def write_api_key(api_key: str) -> None:
+def provider_api_key_target(provider_id: str) -> str:
+    """Return a stable Credential Manager target for an allow-listed-style id."""
+    if provider_id == "deepseek":
+        # Preserve the V2.9.x target so an upgrade does not lose the saved key.
+        return API_KEY_TARGET
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", provider_id):
+        raise CredentialError(f"模型厂商标识无效：{provider_id}")
+    return f"{PROVIDER_KEY_PREFIX}/{provider_id}/ApiKey"
+
+
+def write_api_key(api_key: str, provider_id: str = "deepseek") -> None:
     if not api_key:
         raise CredentialError("API Key 不能为空")
     _write_secret(
-        API_KEY_TARGET, api_key, "DeepSeek",
-        "DeepSeek API Key（由 Claude Code + DeepSeek 一键配置器保存）",
+        provider_api_key_target(provider_id), api_key, provider_id,
+        f"{provider_id} API Key（由 Claude Code 国产模型配置器保存）",
     )
 
 
-def read_api_key() -> str | None:
-    return _read_secret(API_KEY_TARGET)
+def read_api_key(provider_id: str = "deepseek") -> str | None:
+    return _read_secret(provider_api_key_target(provider_id))
 
 
 def write_proxy_token(token: str) -> None:
@@ -137,6 +150,9 @@ def read_proxy_token() -> str | None:
     return _read_secret(PROXY_TOKEN_TARGET)
 
 
-def delete_saved_credentials() -> None:
-    _delete_secret(API_KEY_TARGET)
+def delete_saved_credentials(provider_ids: Iterable[str] = ()) -> None:
+    targets = {API_KEY_TARGET}
+    targets.update(provider_api_key_target(provider_id) for provider_id in provider_ids)
+    for target in sorted(targets):
+        _delete_secret(target)
     _delete_secret(PROXY_TOKEN_TARGET)
